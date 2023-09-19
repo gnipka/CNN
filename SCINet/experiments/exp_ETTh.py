@@ -213,15 +213,17 @@ class Exp_ETTh(Exp_Basic):
 
         return total_loss
 
-    def train(self, setting):
+    def train(self, setting, nameModel):
         train_data, train_loader = self._get_data(flag = 'train')
         valid_data, valid_loader = self._get_data(flag = 'val')
         test_data, test_loader = self._get_data(flag = 'test')
-        path = os.path.join(self.args.checkpoints, setting)
+        path = os.path.join(self.args.checkpoints, nameModel)
         print(path)
         if not os.path.exists(path):
             os.makedirs(path)
-        writer = SummaryWriter('event/run_ETTh/{}'.format(self.args.model_name))
+
+        pathWriter = 'event/run_ETTh/' + nameModel
+        writer = SummaryWriter(pathWriter)
 
         time_now = time.time()
         
@@ -238,11 +240,10 @@ class Exp_ETTh(Exp_Basic):
             self.model, lr, epoch_start = load_model(self.model, path, model_name=self.args.data, horizon=self.args.horizon)
         else:
             epoch_start = 0
-
+        lossArray = []
         for epoch in range(epoch_start, self.args.train_epochs):
             iter_count = 0
             train_loss = []
-            
             self.model.train()
             epoch_time = time.time()
             for i, (batch_x,batch_y,batch_x_mark,batch_y_mark) in enumerate(train_loader):
@@ -280,6 +281,7 @@ class Exp_ETTh(Exp_Basic):
 
             print("Epoch: {} cost time: {}".format(epoch+1, time.time()-epoch_time))
             train_loss = np.average(train_loss)
+            lossArray.append(train_loss)
             print('--------start to validate-----------')
             valid_loss = self.valid(valid_data, valid_loader, criterion)
             print('--------start to test-----------')
@@ -302,12 +304,12 @@ class Exp_ETTh(Exp_Basic):
         save_model(epoch, lr, self.model, path, model_name=self.args.data, horizon=self.args.pred_len)
         best_model_path = path+'/'+'checkpoint.pth'
         self.model.load_state_dict(torch.load(best_model_path))
-        return self.model
+        return self.model, lossArray
 
-    def predict(self, setting):
+    def predict(self, nameModel):
         self.model.eval()
-        
-        path = os.path.join(self.args.checkpoints, setting)
+
+        path = os.path.join(self.args.checkpoints, nameModel)
         best_model_path = path+'/'+'checkpoint.pth'
         self.model.load_state_dict(torch.load(best_model_path, map_location=torch.device('cpu')))
 
@@ -394,7 +396,7 @@ class Exp_ETTh(Exp_Basic):
         mid_scales = []
         
         if evaluate:
-            path = os.path.join(self.args.checkpoints, setting)
+            path = os.path.join(self.args.checkpoints, self.args.model_name)
             best_model_path = path+'/'+'checkpoint.pth'
             self.model.load_state_dict(torch.load(best_model_path))
 
@@ -465,7 +467,7 @@ class Exp_ETTh(Exp_Basic):
 
         # result save
         if self.args.save:
-            folder_path = 'exp/ett_results/' + setting + '/'
+            folder_path = 'exp/ett_results/' + self.args.model_name + '/'
             if not os.path.exists(folder_path):
                 os.makedirs(folder_path)
 
